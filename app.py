@@ -13,23 +13,24 @@ def angel_login():
     try:
         api_key = st.secrets["API_KEY"]
         client_id = st.secrets["CLIENT_ID"]
-        pwd = st.secrets["PASSWORD"]
-        totp = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
+        client_secret = st.secrets["CLIENT_SECRET"]
+        mpin = st.secrets["MPIN"]
+        totp_code = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
 
-        smartApi = SmartConnect(api_key=api_key)
-        session = smartApi.generateSession(client_id, pwd, totp)
+        smartApi = SmartConnectV2(api_key=api_key)
+        session = smartApi.generateSessionV2(
+            client_id=client_id,
+            client_secret=client_secret,
+            mpin=mpin,
+            totp=totp_code
+        )
 
-        st.code(f"Session Response: {session}")  # DEBUG LINE
-
-        if session and "data" in session and session["data"]:
-            feed_token = session["data"].get("feedToken") or session["data"].get("feed_token")
-            return smartApi, feed_token
-        else:
-            st.error("❌ Angel login failed. Check credentials or session object.")
-            return None, None
+        st.success("✅ Angel Login Successful")
+        st.code(f"Session: {session}")
+        return smartApi, session["data"]["feedToken"]
 
     except Exception as e:
-        st.error(f"Login Failed: {e}")
+        st.error(f"❌ Login Failed: {e}")
         return None, None
 
 
