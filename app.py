@@ -29,33 +29,35 @@ def angel_login():
         st.error(f"Angel login failed. Check credentials or session object.\n\n{e}")
         return None, None
 
-# Function to fetch live option chain data
+# Function to fetch live option chain data dynamically
+@st.cache_data(ttl=30)
 def get_live_option_chain():
     smart_api, feed_token = angel_login()
     if not smart_api or not feed_token:
         return pd.DataFrame(columns=["Strike Symbol", "LTP"])
 
-    # Search for a few real tokens for NIFTY CE and PE options
-    symbols = [
-        {"symbol": "NIFTY24J27600CE", "exchange": "NFO", "token": "123456"},
-        {"symbol": "NIFTY24J27600PE", "exchange": "NFO", "token": "123457"},
-    ]
+    # Define the strike symbols to be searched
+    strike_symbols = ["NIFTY24J27600CE", "NIFTY24J27600PE"]
 
     data = []
-    for item in symbols:
+    for symbol in strike_symbols:
         try:
+            result = smart_api.searchScrip("NFO", symbol)
+            if not result:
+                raise ValueError("Symbol not found")
+
+            token = result["data"][0]["token"] if isinstance(result["data"], list) else result["data"]["token"]
             ltp_data = smart_api.ltpData(
-                exchange=item["exchange"],
-                tradingsymbol=item["symbol"],
-                symboltoken=item["token"]
+                exchange="NFO",
+                tradingsymbol=symbol,
+                symboltoken=token
             )
             ltp = ltp_data["data"]["ltp"]
         except:
             ltp = "--"
-        data.append({"Strike Symbol": item["symbol"], "LTP": ltp})
+        data.append({"Strike Symbol": symbol, "LTP": ltp})
 
     return pd.DataFrame(data)
-
 
 # Display Option Chain
 st.subheader("📊 Live Nifty Option Chain")
