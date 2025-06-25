@@ -11,10 +11,10 @@ st.title("🔥 Nifty Option Scalping Dashboard")
 @st.cache_resource
 def angel_login():
     try:
-        api_key = st.secrets["EnOXc5bE"]
-        client_id = st.secrets["AAAN045886"]
-        pwd = st.secrets["Rahul@1milliondollar"]
-        totp = pyotp.TOTP(st.secrets["7CXNCG54UO5ZYS7RXNFVTMRNGA"]).now()
+        api_key = st.secrets["API_KEY"]
+        client_id = st.secrets["CLIENT_ID"]
+        pwd = st.secrets["PASSWORD"]
+        totp = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
 
         smartApi = SmartConnect(api_key=api_key)
         session = smartApi.generateSession(client_id, pwd, totp)
