@@ -1,6 +1,6 @@
 streamlit
 pandas
-smartapi-python>=1.0.16
+smartapi-python
 pyotp
 logzero
 websocket-client
