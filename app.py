@@ -1,69 +1,87 @@
 import streamlit as st
 import pandas as pd
 from SmartApi.smartConnect import SmartConnect
+from SmartApi.smartWebSocketV2 import SmartWebSocketV2
 import pyotp
+import json
 
-# Set up Streamlit page
 st.set_page_config(page_title="Nifty Option Scalping", layout="wide")
 st.title("🔥 Nifty Option Scalping Dashboard")
 
-# Function for Angel One login using MPIN and TOTP
+# Login and generate tokens
 @st.cache_resource
 def angel_login():
-    try:
-        obj = SmartConnect(api_key=st.secrets["API_KEY"])
-        totp = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
-        session = obj.generateSession(
-            st.secrets["CLIENT_ID"],
-            st.secrets["MPIN"],
-            totp
-        )
-        feed_token = obj.getfeedToken()
-        return obj, feed_token
-    except Exception as e:
-        st.error(f"Angel login failed. Check credentials or session object.\n\n{e}")
-        return None, None
+    obj = SmartConnect(api_key=st.secrets["API_KEY"])
+    totp = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
+    session = obj.generateSession(
+        st.secrets["CLIENT_ID"],
+        st.secrets["MPIN"],
+        totp
+    )
+    feed_token = obj.getfeedToken()
+    return obj, feed_token, st.secrets["CLIENT_ID"]
 
-# Fetch token using SmartAPI's searchScrip function
-def get_token(smart_api, symbol, exchange):
+# Get token using SmartAPI's searchScrip
+def get_token(api, symbol, exchange):
     try:
-        response = smart_api.searchScrip(exchange=exchange, symbol=symbol)
-        return response['data'][0]['token']
+        res = api.searchScrip(exchange=exchange, symbol=symbol)
+        return res['data'][0]['token']
     except:
         return None
 
-# Function to fetch live option chain data
-def get_live_option_chain():
-    smart_api, feed_token = angel_login()
-    if not smart_api or not feed_token:
-        return pd.DataFrame(columns=["Strike Symbol", "LTP"])
+# Store live LTPs in session
+if "live_ltp" not in st.session_state:
+    st.session_state.live_ltp = {}
 
-    # Define symbols and exchange
-    raw_symbols = [
-        ("NIFTY24J27600CE", "NFO"),
-        ("NIFTY24J27600PE", "NFO"),
-    ]
+symbols = [("NIFTY24J27600CE", "NFO"), ("NIFTY24J27600PE", "NFO")]
 
-    data = []
-    for sym, exch in raw_symbols:
-        token = get_token(smart_api, sym, exch)
-        if not token:
-            data.append({"Strike Symbol": sym, "LTP": "--"})
-            continue
+api, feed_token, client_code = angel_login()
+symbol_tokens = []
 
-        try:
-            ltp_data = smart_api.ltpData(exchange=exch, tradingsymbol=sym, symboltoken=token)
-            ltp = ltp_data["data"]["ltp"]
-        except:
-            ltp = "--"
-        data.append({"Strike Symbol": sym, "LTP": ltp})
+for sym, exch in symbols:
+    token = get_token(api, sym, exch)
+    if token:
+        symbol_tokens.append({
+            "symbol": sym,
+            "token": token,
+            "exchange": exch,
+        })
 
-    return pd.DataFrame(data)
+# WebSocket setup
+def on_tick(wsapp, message):
+    data = json.loads(message)
+    for item in data['data']:
+        sym = item['tsym']
+        ltp = item['ltp']
+        st.session_state.live_ltp[sym] = ltp
 
-# Display Option Chain
+def on_open(wsapp):
+    print("WebSocket opened.")
+    tokens = [{"exch": "NFO", "token": s["token"]} for s in symbol_tokens]
+    wsapp.subscribe(tokens)
+
+# Run WebSocket in background
+def run_websocket():
+    ws = SmartWebSocketV2(
+        feedToken=feed_token,
+        client_code=client_code,
+        api_key=st.secrets["API_KEY"]
+    )
+    ws.on_open = on_open
+    ws.on_tick = on_tick
+    ws.connect()
+
+if "ws_thread_started" not in st.session_state:
+    thread = threading.Thread(target=run_websocket)
+    thread.start()
+    st.session_state.ws_thread_started = True
+
+# Show real-time data
 st.subheader("📊 Live Nifty Option Chain")
-option_data = get_live_option_chain()
-st.dataframe(option_data, use_container_width=True)
+table = []
+for s in symbol_tokens:
+    sym = s["symbol"]
+    ltp = st.session_state.live_ltp.get(sym, "--")
+    table.append({"Strike Symbol": sym, "LTP": ltp})
 
-# Footer
-st.markdown("**Data updates every ~30 seconds using Angel One SmartAPI**")
+st.dataframe(pd.DataFrame(table), use_container_width=True)
