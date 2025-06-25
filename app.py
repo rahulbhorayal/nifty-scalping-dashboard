@@ -19,6 +19,8 @@ def angel_login():
         smartApi = SmartConnect(api_key=api_key)
         session = smartApi.generateSession(client_id, pwd, totp)
 
+        st.code(f"Session Response: {session}")  # DEBUG LINE
+
         if session and "data" in session and session["data"]:
             feed_token = session["data"].get("feedToken") or session["data"].get("feed_token")
             return smartApi, feed_token
@@ -29,6 +31,7 @@ def angel_login():
     except Exception as e:
         st.error(f"Login Failed: {e}")
         return None, None
+
 
 # Run login
 smartApi, feedToken = angel_login()
