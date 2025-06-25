@@ -24,30 +24,39 @@ def angel_login():
         st.error(f"Angel login failed. Check credentials or session object.\n\n{e}")
         return None, None
 
-# Function to fetch live option chain data using searchScrip
-@st.cache_data(ttl=60)
+# Fetch token using SmartAPI's searchScrip function
+def get_token(smart_api, symbol, exchange):
+    try:
+        response = smart_api.searchScrip(exchange=exchange, symbol=symbol)
+        return response['data'][0]['token']
+    except:
+        return None
+
+# Function to fetch live option chain data
 def get_live_option_chain():
     smart_api, feed_token = angel_login()
     if not smart_api or not feed_token:
         return pd.DataFrame(columns=["Strike Symbol", "LTP"])
 
-    # List of tradingsymbols to be queried
-    tradingsymbols = ["NIFTY24J27600CE", "NIFTY24J27600PE"]
+    # Define symbols and exchange
+    raw_symbols = [
+        ("NIFTY24J27600CE", "NFO"),
+        ("NIFTY24J27600PE", "NFO"),
+    ]
 
     data = []
-    for symbol in tradingsymbols:
+    for sym, exch in raw_symbols:
+        token = get_token(smart_api, sym, exch)
+        if not token:
+            data.append({"Strike Symbol": sym, "LTP": "--"})
+            continue
+
         try:
-            result = smart_api.searchScrip("NFO", symbol)
-            token = result["data"][0]["token"]
-            ltp_data = smart_api.ltpData(
-                exchange="NFO",
-                tradingsymbol=symbol,
-                symboltoken=token
-            )
+            ltp_data = smart_api.ltpData(exchange=exch, tradingsymbol=sym, symboltoken=token)
             ltp = ltp_data["data"]["ltp"]
-        except Exception as e:
-            ltp = f"Error: {e}"
-        data.append({"Strike Symbol": symbol, "LTP": ltp})
+        except:
+            ltp = "--"
+        data.append({"Strike Symbol": sym, "LTP": ltp})
 
     return pd.DataFrame(data)
 
@@ -57,4 +66,4 @@ option_data = get_live_option_chain()
 st.dataframe(option_data, use_container_width=True)
 
 # Footer
-st.markdown("**Data updates every ~60 seconds using Angel One SmartAPI**")
+st.markdown("**Data updates every ~30 seconds using Angel One SmartAPI**")
