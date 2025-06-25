@@ -32,7 +32,7 @@ def get_token(api, symbol, exchange):
 api, feed_token, client_code = angel_login()
 print("🟢 Login success:", api is not None, "| feed_token:", feed_token)
 
-symbols = [("NIFTY24J27600CE", "NFO"), ("NIFTY24J27600PE", "NFO")]
+symbols = [("NIFTY24J27650CE", "NFO"), ("NIFTY24J27650PE", "NFO")]
 print("📦 Symbols list to fetch:", symbols)
 
 symbol_tokens = []
