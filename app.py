@@ -19,15 +19,12 @@ def angel_login():
         smartApi = SmartConnect(api_key=api_key)
         session = smartApi.generateSession(client_id, pwd, totp)
 
-        if not session or "data" not in session:
-            raise ValueError("Login failed. Check credentials or session response.")
-
-        feed_token = session["data"].get("feedToken") or session["data"].get("feed_token")
-
-        if not feed_token:
-            raise ValueError("❌ 'feedToken' missing in session response.")
-
-        return smartApi, feed_token
+        if session and "data" in session and session["data"]:
+            feed_token = session["data"].get("feedToken") or session["data"].get("feed_token")
+            return smartApi, feed_token
+        else:
+            st.error("❌ Angel login failed. Check credentials or session object.")
+            return None, None
 
     except Exception as e:
         st.error(f"Login Failed: {e}")
