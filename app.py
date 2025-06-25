@@ -11,13 +11,12 @@ st.title("🔥 Nifty Option Scalping Dashboard")
 def angel_login():
     try:
         obj = SmartConnect(api_key=st.secrets["API_KEY"])
-        session = obj.generateSessionV2(
+        session = obj.generateSessionV(
             client_id=st.secrets["CLIENT_ID"],
-            secret_key=st.secrets["CLIENT_SECRET"],
-            totp_secret=st.secrets["TOTP_SECRET"],
-            mpin=st.secrets["MPIN"]
+            password=st.secrets["MPIN"]
         )
-        return obj, session["data"]["feedToken"]
+        feed_token = obj.getfeedToken()
+        return obj, feed_token
     except Exception as e:
         st.error(f"Angel login failed. Check credentials or session object.\n\n{e}")
         return None, None
