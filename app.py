@@ -1,69 +1,56 @@
 import streamlit as st
 import pandas as pd
-import requests
 from SmartApi.smartConnect import SmartConnect
+import pyotp  # Make sure pyotp is included in requirements.txt
 
 # Set up Streamlit page
 st.set_page_config(page_title="Nifty Option Scalping", layout="wide")
 st.title("🔥 Nifty Option Scalping Dashboard")
 
-# Function to login using MPIN
+# Function for Angel One login using MPIN and TOTP
 @st.cache_resource
 def angel_login():
     try:
         obj = SmartConnect(api_key=st.secrets["API_KEY"])
+
+        # Generate TOTP dynamically
+        totp = pyotp.TOTP(st.secrets["TOTP_SECRET"]).now()
+
+        # Perform login with Client ID, MPIN, and TOTP
         session = obj.generateSession(
-            client_id=st.secrets["CLIENT_ID"],
-            password=st.secrets["MPIN"]
+            st.secrets["CLIENT_ID"],
+            st.secrets["MPIN"],
+            totp
         )
+
         feed_token = obj.getfeedToken()
         return obj, feed_token
     except Exception as e:
         st.error(f"Angel login failed. Check credentials or session object.\n\n{e}")
         return None, None
 
-# Function to load instrument list
-@st.cache_resource
-def load_instruments():
-    url = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
-    instruments = requests.get(url).json()
-    df = pd.DataFrame(instruments)
-    return df
-
-# Function to get tokens for strike prices
-def get_strike_tokens(df, underlying='NIFTY', expiry='25JUL2024', strikes=[17800, 18000, 18200], option_type='CE'):
-    result = []
-    for strike in strikes:
-        row = df[
-            (df['name'] == underlying) &
-            (df['expiry'] == expiry) &
-            (df['strike'] == strike * 100) &
-            (df['symbol'].str.endswith(option_type))
-        ].head(1)
-        if not row.empty:
-            result.append({
-                "symbol": row.iloc[0]["symbol"],
-                "token": row.iloc[0]["token"]
-            })
-    return result
-
-# Function to get live option chain
+# Function to fetch live option chain data
 def get_live_option_chain():
     smart_api, feed_token = angel_login()
     if not smart_api or not feed_token:
         return pd.DataFrame(columns=["Strike Symbol", "LTP"])
 
-    df = load_instruments()
-    symbols = get_strike_tokens(df, expiry='25JUL2024', strikes=[17800, 18000, 18200], option_type='CE') + \
-              get_strike_tokens(df, expiry='25JUL2024', strikes=[17800, 18000], option_type='PE')
+    symbols = [
+        "NSE:NIFTY24704178000CE",
+        "NSE:NIFTY24704180000CE",
+        "NSE:NIFTY24704182000CE",
+        "NSE:NIFTY24704178000PE",
+        "NSE:NIFTY24704180000PE"
+    ]
 
     data = []
-    for item in symbols:
+    for symbol in symbols:
         try:
-            ltp = smart_api.ltpData('NFO', item['symbol'], item['token'])['data']['ltp']
+            ltp_data = smart_api.ltpData(exchange="NSE", tradingsymbol=symbol, symboltoken=None)
+            ltp = ltp_data["data"]["ltp"]
         except:
             ltp = "--"
-        data.append({"Strike Symbol": item['symbol'], "LTP": ltp})
+        data.append({"Strike Symbol": symbol, "LTP": ltp})
 
     return pd.DataFrame(data)
 
