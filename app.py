@@ -37,7 +37,9 @@ if "live_ltp" not in st.session_state:
 symbols = [("NIFTY24J27600CE", "NFO"), ("NIFTY24J27600PE", "NFO")]
 
 api, feed_token, client_code = angel_login()
+print("🟢 Login success:", api is not None, "| feed_token:", feed_token)
 symbol_tokens = []
+print("📦 Symbols list to fetch:", symbols)
 
 print("✅ Token fetching result:")  # Add this before the loop
 
