@@ -1,68 +1,70 @@
 import streamlit as st
 import pandas as pd
+from SmartApi import SmartConnect
 import pyotp
-from SmartApi.smartConnect import SmartConnect
-import time
 
-# -------------------------------
-# 🧠 Your Angel One API Details
-# -------------------------------
-API_KEY = "EnOXc5bE"
-CLIENT_CODE = "AAAN045886"
-PASSWORD = "Rahul@1milliondollar"
-TOTP_SECRET = "7CXNCG54UO5ZYS7RXNFVTMRNGA"
+# Set up the page
+st.set_page_config(page_title="Nifty Option Scalping", layout="wide")
+st.title("🔥 Nifty Option Scalping Dashboard")
 
-# -------------------------------
-# 🧾 Get Access Token using TOTP
-# -------------------------------
-@st.cache_resource(show_spinner=False)
+# Login function using secrets and SmartAPI
+@st.cache_resource
 def angel_login():
-    smartApi = SmartConnect(api_key=API_KEY)
-    token = pyotp.TOTP(TOTP_SECRET).now()
-    session = smartApi.generateSession(CLIENT_CODE, PASSWORD, token)
-    return smartApi, session["feedToken"]
+    try:
+        api_key = st.secrets["EnOXc5bE"]
+        client_id = st.secrets["AAAN045886"]
+        pwd = st.secrets["Rahul@1milliondollar"]
+        totp = pyotp.TOTP(st.secrets["7CXNCG54UO5ZYS7RXNFVTMRNGA"]).now()
 
-# -------------------------------
-# 🟢 Simulated Live Option Data (replace later with WebSocket)
-# -------------------------------
-def get_live_option_chain():
-    # This part will later be replaced by actual WebSocket price updates
-    return pd.DataFrame({
-        'Strike Symbol': [
-            'NIFTY2452717900CE', 'NIFTY2452718000CE',
-            'NIFTY2452718100CE', 'NIFTY2452717900PE',
-            'NIFTY2452718000PE', 'NIFTY2452718100PE'
-        ],
-        'LTP': [118.6, 120.2, 122.1, 111.45, 109.9, 108.4]
+        smartApi = SmartConnect(api_key=api_key)
+        session = smartApi.generateSession(client_id, pwd, totp)
+
+        feed_token = session['data'].get("feedToken") or session['data'].get("feed_token")
+        if not feed_token:
+            raise ValueError("❌ 'feedToken' not found in session response.")
+
+        return smartApi, feed_token
+
+    except Exception as e:
+        st.error(f"Login Failed: {e}")
+        raise
+
+# Run login
+smartApi, feedToken = angel_login()
+
+# Define a few Nifty option strike symbols to track
+option_symbols = [
+    "NSE:NIFTY2470417800CE",
+    "NSE:NIFTY2470418000CE",
+    "NSE:NIFTY2470418200CE",
+    "NSE:NIFTY2470417800PE",
+    "NSE:NIFTY2470418000PE"
+]
+
+st.subheader("Live Nifty Option Chain")
+placeholder = st.empty()
+
+# Function to fetch latest LTPs
+@st.cache_data(ttl=30)
+def fetch_ltp(symbol):
+    try:
+        exchange = symbol.split(":")[0]
+        token = symbol.split(":")[1]
+        ltp_data = smartApi.ltpData(exchange, token[:-2], token)
+        return ltp_data['data']['ltp']
+    except:
+        return "--"
+
+# Main live update loop
+data = []
+for sym in option_symbols:
+    data.append({
+        "Strike Symbol": sym,
+        "LTP": fetch_ltp(sym)
     })
 
-# -------------------------------
-# 📊 Streamlit UI
-# -------------------------------
-st.set_page_config(page_title="Nifty Option Scalping", layout="wide")
-st.title("⚡ Nifty Option Scalping Dashboard")
+# Display live data
+df = pd.DataFrame(data)
+placeholder.dataframe(df, use_container_width=True)
 
-tab1, tab2 = st.tabs(["Live Option Chain", "Place Trade"])
-
-with tab1:
-    st.subheader("Live Nifty Option Chain")
-
-    # Authenticate
-    with st.spinner("Logging in to Angel One..."):
-        smartApi, feedToken = angel_login()
-        st.success("Logged in successfully!")
-
-    # Show mock data (replace with real-time later)
-    df = get_live_option_chain()
-    st.dataframe(df, use_container_width=True)
-
-with tab2:
-    st.subheader("Place Trade (Simulated)")
-    selected_strike = st.selectbox("Select Strike", df['Strike Symbol'])
-    entry_price = st.number_input("Entry Price", min_value=0.0, format="%.2f")
-    stop_loss = entry_price - 1 if entry_price else 0
-    st.text(f"Calculated Stop Loss: ₹{stop_loss:.2f}")
-
-    if st.button("📈 Place Buy + SL Order"):
-        st.success(f"Simulated Buy Order: {selected_strike} at ₹{entry_price:.2f}")
-        st.info(f"Stop Loss set at ₹{stop_loss:.2f}")
+st.caption("Data updates every ~30 seconds using Angel One SmartAPI")
