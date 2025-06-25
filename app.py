@@ -39,14 +39,18 @@ symbols = [("NIFTY24J27600CE", "NFO"), ("NIFTY24J27600PE", "NFO")]
 api, feed_token, client_code = angel_login()
 symbol_tokens = []
 
+print("✅ Token fetching result:")  # Add this before the loop
+
 for sym, exch in symbols:
     token = get_token(api, sym, exch)
+    print(f"Symbol: {sym}, Token: {token}")  # Add this inside the loop
     if token:
         symbol_tokens.append({
             "symbol": sym,
             "token": token,
             "exchange": exch,
         })
+
 
 # WebSocket setup
 def on_tick(wsapp, message):
