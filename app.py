@@ -49,6 +49,7 @@ for sym, exch in symbols:
 
 # WebSocket setup
 def on_tick(wsapp, message):
+    print("✅ Tick received:", message)  # <-- Add this line
     data = json.loads(message)
     for item in data['data']:
         sym = item['tsym']
@@ -56,8 +57,9 @@ def on_tick(wsapp, message):
         st.session_state.live_ltp[sym] = ltp
 
 def on_open(wsapp):
-    print("WebSocket opened.")
+    print("🚀 WebSocket opened")  # <-- Add this line
     tokens = [{"exch": "NFO", "token": s["token"]} for s in symbol_tokens]
+    print("📡 Subscribing to tokens:", tokens)  # <-- Add this line
     wsapp.subscribe(tokens)
 
 # Run WebSocket in background
