@@ -35,24 +35,27 @@ def get_live_option_chain():
     if not smart_api or not feed_token:
         return pd.DataFrame(columns=["Strike Symbol", "LTP"])
 
+    # Search for a few real tokens for NIFTY CE and PE options
     symbols = [
-        "NSE:NIFTY24704178000CE",
-        "NSE:NIFTY24704180000CE",
-        "NSE:NIFTY24704182000CE",
-        "NSE:NIFTY24704178000PE",
-        "NSE:NIFTY24704180000PE"
+        {"symbol": "NIFTY24J27600CE", "exchange": "NFO", "token": "123456"},
+        {"symbol": "NIFTY24J27600PE", "exchange": "NFO", "token": "123457"},
     ]
 
     data = []
-    for symbol in symbols:
+    for item in symbols:
         try:
-            ltp_data = smart_api.ltpData(exchange="NSE", tradingsymbol=symbol, symboltoken=None)
+            ltp_data = smart_api.ltpData(
+                exchange=item["exchange"],
+                tradingsymbol=item["symbol"],
+                symboltoken=item["token"]
+            )
             ltp = ltp_data["data"]["ltp"]
         except:
             ltp = "--"
-        data.append({"Strike Symbol": symbol, "LTP": ltp})
+        data.append({"Strike Symbol": item["symbol"], "LTP": ltp})
 
     return pd.DataFrame(data)
+
 
 # Display Option Chain
 st.subheader("📊 Live Nifty Option Chain")
